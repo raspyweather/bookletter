@@ -1,0 +1,44 @@
+{
+  "profiles": {
+    "All outputs (16-page signatures)": {
+      "commandName": "Project",
+      "commandLineArgs": "--input ./sample20.pdf --output ../../out/all --signature-size 16 --mode all --dpi 150"
+    },
+    "Duplex only (auto-duplex printer)": {
+      "commandName": "Project",
+      "commandLineArgs": "--input ./sample20.pdf --output ../../out/duplex --mode duplex --dpi 150"
+    },
+    "Split into separate booklets per signature": {
+      "commandName": "Project",
+      "commandLineArgs": "--input ./apus.pdf --output ../../out/split --skip-pages 2 --signature-size 16 --split-signatures --mode duplex --dpi 1200"
+    },
+    "Skip a leading cover page": {
+      "commandName": "Project",
+      "commandLineArgs": "--input ./sample20.pdf --output ../../out/skip --skip-pages 4 --mode all --dpi 150"
+    },
+    "Fixed A4 sheet size with margin and gap": {
+      "commandName": "Project",
+      "commandLineArgs": "--input ./sample20.pdf --output ../../out/custom-sheet --sheet-size A4 --margin 5mm --gap 3mm --mode all --dpi 150"
+    },
+    "Reversed page order": {
+      "commandName": "Project",
+      "commandLineArgs": "--input ./sample20.pdf --output ../../out/reversed --page-order reversed --mode all --dpi 150"
+    },
+    "Loose images output (jpg)": {
+      "commandName": "Project",
+      "commandLineArgs": "--input ./sample20.pdf --output ../../out/images --mode images --image-format jpg --jpeg-quality 85 --dpi 150"
+    },
+    "Show help": {
+      "commandName": "Project",
+      "commandLineArgs": "--help"
+    },
+    "Cut marks + overshoot fill (undersized page on A4 sheet)": {
+      "commandName": "Project",
+      "commandLineArgs": "--input ./sample_undersize.pdf --output ../../out/cutmarks --signature-size 8 --mode images --sheet-size A3 --cut-marks --dpi 150"
+    },
+    "Cut marks + apus + overshoot fill (undersized page on A4 sheet)": {
+      "commandName": "Project",
+      "commandLineArgs": "--input ./apus.pdf --output ../../out/apus_cutmarks_30 --skip-pages 2 --signature-size 16 --split-signatures --mode frontback --margin 30pt --cut-marks --dpi 1200"
+    }
+  }
+}

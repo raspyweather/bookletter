@@ -22,3 +22,7 @@
 # OS cruft
 .DS_Store
 Thumbs.db
+
+# Stray local test PDFs dropped at the project root for manual testing - the
+# project's actual sample fixtures live in samples/ and are tracked normally.
+/*.pdf

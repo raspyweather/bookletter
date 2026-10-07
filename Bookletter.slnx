@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Bookletter.Core/Bookletter.Core.csproj" />
+    <Project Path="src/Bookletter.Gui/Bookletter.Gui.csproj" />
+    <Project Path="src/Bookletter/Bookletter.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/SampleGenerator/SampleGenerator.csproj" />
+  </Folder>
+</Solution>
