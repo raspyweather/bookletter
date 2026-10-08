@@ -10,11 +10,11 @@
     },
     "Split into separate booklets per signature": {
       "commandName": "Project",
-      "commandLineArgs": "--input ./apus.pdf --output ../../out/split --skip-pages 2 --signature-size 16 --split-signatures --mode duplex --dpi 1200"
+      "commandLineArgs": "--input ./sample20.pdf --output ../../out/split --pages 3- --signature-size 16 --split-signatures --mode duplex --dpi 1200"
     },
     "Skip a leading cover page": {
       "commandName": "Project",
-      "commandLineArgs": "--input ./sample20.pdf --output ../../out/skip --skip-pages 4 --mode all --dpi 150"
+      "commandLineArgs": "--input ./sample20.pdf --output ../../out/skip --pages 5- --mode all --dpi 150"
     },
     "Fixed A4 sheet size with margin and gap": {
       "commandName": "Project",
@@ -36,9 +36,9 @@
       "commandName": "Project",
       "commandLineArgs": "--input ./sample_undersize.pdf --output ../../out/cutmarks --signature-size 8 --mode images --sheet-size A3 --cut-marks --dpi 150"
     },
-    "Cut marks + apus + overshoot fill (undersized page on A4 sheet)": {
+    "Cut marks + split signatures (high-res)": {
       "commandName": "Project",
-      "commandLineArgs": "--input ./apus.pdf --output ../../out/apus_cutmarks_30 --skip-pages 2 --signature-size 16 --split-signatures --mode frontback --margin 30pt --cut-marks --dpi 1200"
+      "commandLineArgs": "--input ./sample20.pdf --output ../../out/cutmarks_split --pages 3- --signature-size 16 --split-signatures --mode frontback --margin 30pt --cut-marks --dpi 1200"
     }
   }
 }
