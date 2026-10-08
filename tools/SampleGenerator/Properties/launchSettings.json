@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Generate sample20.pdf": {
+      "commandName": "Project",
+      "commandLineArgs": "20 ../../samples/sample20.pdf"
+    },
+    "Generate sample_undersize.pdf": {
+      "commandName": "Project",
+      "commandLineArgs": "8 ../../samples/sample_undersize.pdf 120 180"
+    }
+  }
+}
