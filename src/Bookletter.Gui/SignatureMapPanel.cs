@@ -106,27 +106,31 @@ public sealed class SignatureMapPanel : UserControl
                 return;
             }
 
-            if (options.SkipPages < 0 || options.SkipPages >= sourcePageCount)
+            IReadOnlyList<int> selectedPages;
+            try
             {
-                ShowMessage($"--skip-pages ({options.SkipPages}) must be less than the source page count ({sourcePageCount}).");
+                selectedPages = PageSelector.Parse(options.Pages, sourcePageCount);
+            }
+            catch (Exception ex)
+            {
+                ShowMessage(ex.Message);
                 return;
             }
 
-            int totalPages = sourcePageCount - options.SkipPages;
-            var spreads = SignatureCalculator.Calculate(totalPages, options.SignatureSize, options.PageOrder);
-            int numSignatures = (int)Math.Ceiling(totalPages / (double)options.SignatureSize);
+            var spreads = SignatureCalculator.Calculate(selectedPages.Count, options.SignatureSize, options.PageOrder);
+            int numSignatures = (int)Math.Ceiling(selectedPages.Count / (double)options.SignatureSize);
 
             _listPanel.SuspendLayout();
             _listPanel.Controls.Clear();
 
-            _summaryLabel.Text = options.SkipPages > 0
-                ? $"{totalPages} usable pages ({sourcePageCount} in source, skipping the first {options.SkipPages}) — " +
+            _summaryLabel.Text = !string.IsNullOrWhiteSpace(options.Pages)
+                ? $"{selectedPages.Count} selected page(s) ({sourcePageCount} in source) — " +
                   $"{numSignatures} signature(s) of {options.SignatureSize}, {spreads.Count} sheet(s) total. Page numbers below are real source page numbers."
-                : $"{totalPages} pages — {numSignatures} signature(s) of {options.SignatureSize}, {spreads.Count} sheet(s) total.";
+                : $"{selectedPages.Count} pages — {numSignatures} signature(s) of {options.SignatureSize}, {spreads.Count} sheet(s) total.";
 
             foreach (var group in spreads.GroupBy(s => s.SignatureIndex))
             {
-                var box = BuildSignatureBox(group.Key, numSignatures, group, options.SkipPages);
+                var box = BuildSignatureBox(group.Key, numSignatures, group, selectedPages);
                 box.Margin = new Padding(0, 0, 10, 10);
                 _listPanel.Controls.Add(box);
             }
@@ -159,7 +163,7 @@ public sealed class SignatureMapPanel : UserControl
     /// needs to be redone once built. Only the outer <see cref="_listPanel"/> decides
     /// how many of these boxes sit side by side.
     /// </summary>
-    private static Control BuildSignatureBox(int signatureIndex, int numSignatures, IEnumerable<SheetSpread> sheets, int skipPages)
+    private static Control BuildSignatureBox(int signatureIndex, int numSignatures, IEnumerable<SheetSpread> sheets, IReadOnlyList<int> selectedPages)
     {
         var tint = SignaturePalette[signatureIndex % SignaturePalette.Length];
         var box = new TableLayoutPanel
@@ -185,7 +189,7 @@ public sealed class SignatureMapPanel : UserControl
 
         foreach (var spread in sheets)
         {
-            var card = BuildSheetCard(spread, skipPages);
+            var card = BuildSheetCard(spread, selectedPages);
             card.Margin = new Padding(0, 0, 0, 6);
             box.Controls.Add(card);
         }
@@ -213,7 +217,7 @@ public sealed class SignatureMapPanel : UserControl
         return box;
     }
 
-    private static Control BuildSheetCard(SheetSpread spread, int skipPages)
+    private static Control BuildSheetCard(SheetSpread spread, IReadOnlyList<int> selectedPages)
     {
         var card = new TableLayoutPanel
         {
@@ -233,15 +237,15 @@ public sealed class SignatureMapPanel : UserControl
             Margin = new Padding(0, 0, 0, 4)
         });
 
-        card.Controls.Add(BuildSideRow("Front", spread.FrontLeftPage, spread.FrontRightPage, skipPages));
-        card.Controls.Add(BuildSideRow("Back", spread.BackLeftPage, spread.BackRightPage, skipPages));
+        card.Controls.Add(BuildSideRow("Front", spread.FrontLeftPage, spread.FrontRightPage, selectedPages));
+        card.Controls.Add(BuildSideRow("Back", spread.BackLeftPage, spread.BackRightPage, selectedPages));
 
         return card;
     }
 
     // A plain 4-column TableLayoutPanel rather than a wrapping FlowLayoutPanel - it's
     // always exactly these 4 cells, so there's no wrap computation to redo on resize.
-    private static Control BuildSideRow(string label, int? left, int? right, int skipPages)
+    private static Control BuildSideRow(string label, int? left, int? right, IReadOnlyList<int> selectedPages)
     {
         var row = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 4, RowCount = 1, Margin = new Padding(0) };
         for (int i = 0; i < 4; i++)
@@ -255,18 +259,21 @@ public sealed class SignatureMapPanel : UserControl
             TextAlign = ContentAlignment.MiddleLeft,
             Margin = new Padding(0, 0, 4, 0)
         }, 0, 0);
-        row.Controls.Add(PageBox(left, skipPages), 1, 0);
+        row.Controls.Add(PageBox(left, selectedPages), 1, 0);
         row.Controls.Add(new Label { Text = "|", Width = 14, Height = 32, TextAlign = ContentAlignment.MiddleCenter }, 2, 0);
-        row.Controls.Add(PageBox(right, skipPages), 3, 0);
+        row.Controls.Add(PageBox(right, selectedPages), 3, 0);
         return row;
     }
 
-    private static Label PageBox(int? page, int skipPages)
+    // "page" is the 1-based position within the selected-pages list (what
+    // SignatureCalculator works in); look up the real 1-based source page number it
+    // refers to, since that's what's actually useful to see here.
+    private static Label PageBox(int? page, IReadOnlyList<int> selectedPages)
     {
         bool blank = !page.HasValue;
         return new Label
         {
-            Text = blank ? "blank" : (page!.Value + skipPages).ToString(),
+            Text = blank ? "blank" : (selectedPages[page!.Value - 1] + 1).ToString(),
             Width = 56,
             Height = 32,
             TextAlign = ContentAlignment.MiddleCenter,

@@ -31,14 +31,14 @@ public sealed class BookletGenerator
         Directory.CreateDirectory(_opts.OutputDir);
 
         var imposition = PrepareImposition();
-        var (rasterizer, spreads, sheetW, sheetH, nativeW, nativeH, sheetsPerSignature, totalPages) = imposition;
+        var (rasterizer, spreads, sheetW, sheetH, nativeW, nativeH, sheetsPerSignature, selectedPages) = imposition;
         var composer = new SheetComposer(_opts.Dpi, _opts.MarginPt, _opts.GapPt, _opts.Background, _opts.AllowUpscale, _opts.ToCutMarkOptions());
 
-        int numSignatures = (int)Math.Ceiling(totalPages / (double)_opts.SignatureSize);
+        int numSignatures = (int)Math.Ceiling(selectedPages.Count / (double)_opts.SignatureSize);
         Console.WriteLine($"Input:      {_opts.InputPath}");
-        if (_opts.SkipPages > 0)
-            Console.WriteLine($"Skipping:   first {_opts.SkipPages} page(s) of the source PDF");
-        Console.WriteLine($"Pages:      {totalPages} (padded to {numSignatures * _opts.SignatureSize} across {numSignatures} signature(s) of {_opts.SignatureSize})");
+        if (!string.IsNullOrWhiteSpace(_opts.Pages))
+            Console.WriteLine($"Selected:   {_opts.Pages}");
+        Console.WriteLine($"Pages:      {selectedPages.Count} (padded to {numSignatures * _opts.SignatureSize} across {numSignatures} signature(s) of {_opts.SignatureSize})");
         Console.WriteLine($"Sheets:     {spreads.Count}");
         Console.WriteLine($"Sheet size: {sheetW:0.##} x {sheetH:0.##} pt ({sheetW / 72.0:0.##} x {sheetH / 72.0:0.##} in) @ {_opts.Dpi} dpi");
         Console.WriteLine($"Native page: {nativeW:0.##} x {nativeH:0.##} pt ({nativeW / 72.0:0.##} x {nativeH / 72.0:0.##} in)");
@@ -49,10 +49,10 @@ public sealed class BookletGenerator
         var frontPages = new List<byte[]>(spreads.Count);
         var backPages = new List<byte[]>(spreads.Count);
 
-        // Page numbers from SignatureCalculator are 1-indexed within the (post-skip) usable
-        // range; map back to a 0-indexed source page by re-adding the skipped pages.
+        // Page numbers from SignatureCalculator are 1-indexed positions within the
+        // selected-pages list; look up the actual 0-indexed source page they refer to.
         SKBitmap? RenderOrNull(int? pageNumber) =>
-            pageNumber.HasValue ? rasterizer.RenderPage(_opts.SkipPages + pageNumber.Value - 1, _opts.Dpi) : null;
+            pageNumber.HasValue ? rasterizer.RenderPage(selectedPages[pageNumber.Value - 1], _opts.Dpi) : null;
 
         byte[] ComposeSide(int? leftPage, int? rightPage)
         {
@@ -62,7 +62,10 @@ public sealed class BookletGenerator
             return ImageFileWriter.EncodePng(sheet);
         }
 
-        static string Fmt(int? p) => p?.ToString() ?? "blank";
+        // Logged as the real source page number (1-based), not the position within
+        // the selection - what a reader of the log wants to know is which page of
+        // their actual PDF ended up where.
+        string Fmt(int? pageNumber) => pageNumber.HasValue ? (selectedPages[pageNumber.Value - 1] + 1).ToString() : "blank";
 
         onProgress?.Invoke(0, spreads.Count);
         for (int i = 0; i < spreads.Count; i++)
@@ -100,10 +103,18 @@ public sealed class BookletGenerator
     /// </summary>
     public PreviewInfo GetPreviewInfo()
     {
-        var (_, spreads, sheetW, sheetH, _, _, _, totalPages) = PrepareImposition();
-        int signatureCount = (int)Math.Ceiling(totalPages / (double)_opts.SignatureSize);
-        return new PreviewInfo(totalPages, signatureCount, spreads.Count, sheetW, sheetH);
+        var (_, spreads, sheetW, sheetH, _, _, _, selectedPages) = PrepareImposition();
+        int signatureCount = (int)Math.Ceiling(selectedPages.Count / (double)_opts.SignatureSize);
+        return new PreviewInfo(selectedPages.Count, signatureCount, spreads.Count, sheetW, sheetH);
     }
+
+    /// <summary>
+    /// The source PDF's raw page count, independent of any --pages selection. Used by
+    /// the GUI to validate the Pages field against the actual document on its own,
+    /// without going through the rest of PrepareImposition (which itself depends on
+    /// Pages already being valid, so it can't answer "is Pages valid for this file").
+    /// </summary>
+    public int GetSourcePageCount() => new PdfRasterizer(_opts.InputPath).PageCount;
 
     /// <summary>
     /// Renders a single sheet side for the current options without writing any output
@@ -115,7 +126,7 @@ public sealed class BookletGenerator
     /// </summary>
     public byte[] RenderPreviewSheet(bool front = true, int globalSheetIndex = 0, int? dpiOverride = null)
     {
-        var (rasterizer, spreads, sheetW, sheetH, nativeW, nativeH, _, _) = PrepareImposition();
+        var (rasterizer, spreads, sheetW, sheetH, nativeW, nativeH, _, selectedPages) = PrepareImposition();
         if (spreads.Count == 0)
             throw new InvalidOperationException("Nothing to preview - the document has no pages.");
 
@@ -124,7 +135,7 @@ public sealed class BookletGenerator
         var composer = new SheetComposer(dpi, _opts.MarginPt, _opts.GapPt, _opts.Background, _opts.AllowUpscale, _opts.ToCutMarkOptions());
 
         SKBitmap? RenderOrNull(int? pageNumber) =>
-            pageNumber.HasValue ? rasterizer.RenderPage(_opts.SkipPages + pageNumber.Value - 1, dpi) : null;
+            pageNumber.HasValue ? rasterizer.RenderPage(selectedPages[pageNumber.Value - 1], dpi) : null;
 
         var (leftPage, rightPage) = front ? (spread.FrontLeftPage, spread.FrontRightPage) : (spread.BackLeftPage, spread.BackRightPage);
         using var left = RenderOrNull(leftPage);
@@ -133,25 +144,20 @@ public sealed class BookletGenerator
         return ImageFileWriter.EncodePng(sheet);
     }
 
-    private (PdfRasterizer Rasterizer, IReadOnlyList<SheetSpread> Spreads, double SheetW, double SheetH, double NativeW, double NativeH, int SheetsPerSignature, int TotalPages) PrepareImposition()
+    private (PdfRasterizer Rasterizer, IReadOnlyList<SheetSpread> Spreads, double SheetW, double SheetH, double NativeW, double NativeH, int SheetsPerSignature, IReadOnlyList<int> SelectedPages) PrepareImposition()
     {
         var rasterizer = new PdfRasterizer(_opts.InputPath);
         int sourcePageCount = rasterizer.PageCount;
 
-        if (_opts.SkipPages < 0)
-            throw new ArgumentException("--skip-pages cannot be negative.");
-        if (_opts.SkipPages >= sourcePageCount)
-            throw new ArgumentException($"--skip-pages ({_opts.SkipPages}) must be less than the source page count ({sourcePageCount}).");
-
-        int totalPages = sourcePageCount - _opts.SkipPages;
-        var spreads = SignatureCalculator.Calculate(totalPages, _opts.SignatureSize, _opts.PageOrder);
+        var selectedPages = PageSelector.Parse(_opts.Pages, sourcePageCount);
+        var spreads = SignatureCalculator.Calculate(selectedPages.Count, _opts.SignatureSize, _opts.PageOrder);
         int sheetsPerSignature = _opts.SignatureSize / 4;
 
         var sizeSpec = SheetSizeSpec.Parse(_opts.SheetSize);
-        var (nativeW, nativeH) = rasterizer.GetPageSizePt(_opts.SkipPages);
+        var (nativeW, nativeH) = rasterizer.GetPageSizePt(selectedPages[0]);
         var (sheetW, sheetH) = sizeSpec.Resolve(nativeW, nativeH, _opts.MarginPt, _opts.GapPt);
 
-        return (rasterizer, spreads, sheetW, sheetH, nativeW, nativeH, sheetsPerSignature, totalPages);
+        return (rasterizer, spreads, sheetW, sheetH, nativeW, nativeH, sheetsPerSignature, selectedPages);
     }
 
     private void WriteFrontBackPdfs(List<byte[]> frontPages, List<byte[]> backPages, double sheetW, double sheetH, int sheetsPerSignature)

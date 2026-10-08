@@ -1,5 +1,6 @@
 using System.Threading;
 using Bookletter.Cli;
+using Bookletter.Imposition;
 using Bookletter.Output;
 using SkiaSharp;
 
@@ -269,6 +270,7 @@ public sealed class MainForm : Form
         {
             _autoPreviewTimer.Stop();
             await RunPreviewAsync(silent: true);
+            await ValidatePagesFieldAsync();
             if (_previewTabs.SelectedTab == _signatureMapTab)
                 await _signatureMapPanel.RefreshMapAsync();
         };
@@ -575,6 +577,36 @@ public sealed class MainForm : Form
         }
     }
 
+    /// <summary>
+    /// Resolves the Pages field against the real source PDF's page count and reflects
+    /// the result on the field itself (see SignaturePagesPanel.SetPagesValidity) - a
+    /// separate, narrower check than the main preview/signature-map pipeline, so a
+    /// problem elsewhere (e.g. an invalid custom sheet size) doesn't get blamed on
+    /// Pages, and so this still works even when nothing else about the current
+    /// settings is valid enough for a preview to render.
+    /// </summary>
+    private async Task ValidatePagesFieldAsync()
+    {
+        string input = _inputOutputPanel.InputPath;
+        if (string.IsNullOrEmpty(input) || !File.Exists(input))
+        {
+            _signaturePagesPanel.SetPagesValidity(true); // nothing to check against yet
+            return;
+        }
+
+        try
+        {
+            var generator = new BookletGenerator(new CliOptions { InputPath = input });
+            int sourcePageCount = await Task.Run(generator.GetSourcePageCount);
+            PageSelector.Parse(_signaturePagesPanel.Pages, sourcePageCount);
+            _signaturePagesPanel.SetPagesValidity(true);
+        }
+        catch (Exception ex)
+        {
+            _signaturePagesPanel.SetPagesValidity(false, ex.Message);
+        }
+    }
+
     private void AppendLog(string text)
     {
         if (_logBox.InvokeRequired)
@@ -628,7 +660,7 @@ public sealed class MainForm : Form
             ImageFormat = _outputModePanel.ImageFormat,
             JpegQuality = _outputModePanel.JpegQuality,
             ReverseBackOrder = _signaturePagesPanel.ReverseBackOrder,
-            SkipPages = _signaturePagesPanel.SkipPages,
+            Pages = _signaturePagesPanel.Pages,
             SplitSignatures = _signaturePagesPanel.SplitSignatures,
             AllowUpscale = _sheetLayoutPanel.AllowUpscale,
             CutMarks = _cutMarksPanel.CutMarksEnabled,

@@ -20,7 +20,7 @@ public sealed class CliOptions
     public string ImageFormat { get; set; } = "png";
     public int JpegQuality { get; set; } = 90;
     public bool ReverseBackOrder { get; set; } = false;
-    public int SkipPages { get; set; } = 0;
+    public string Pages { get; set; } = "";
     public bool SplitSignatures { get; set; } = false;
     public bool AllowUpscale { get; set; } = false;
     public bool CutMarks { get; set; } = false;
@@ -84,7 +84,7 @@ public sealed class CliOptions
         if (opts.TryGetValue("--background", out v)) result.Background = ParseColor(v);
         if (opts.TryGetValue("--image-format", out v)) result.ImageFormat = v;
         if (opts.TryGetValue("--jpeg-quality", out v)) result.JpegQuality = int.Parse(v);
-        if (opts.TryGetValue("--skip-pages", out v)) result.SkipPages = int.Parse(v);
+        if (opts.TryGetValue("--pages", out v)) result.Pages = v;
         if (opts.TryGetValue("--cut-mark-gap", out v)) result.CutMarkGapPt = ParseLength(v);
         if (opts.TryGetValue("--cut-mark-length", out v)) result.CutMarkLengthPt = ParseLength(v);
         if (opts.TryGetValue("--cut-mark-stroke", out v)) result.CutMarkStrokePt = ParseLength(v);
@@ -169,9 +169,13 @@ public sealed class CliOptions
           -i, --input <path>        Source PDF (required).
           -o, --output <dir>        Output directory (default: output).
           --signature-size <n>      Pages per signature; must be a multiple of 4 (default: 16).
-          --skip-pages <n>          Drop the first n pages of the source PDF before imposition (default: 0).
-                                       Use this when a cover or title page is handled separately and shouldn't
-                                       be counted as page 1 of the booklet.
+          --pages <selector>        Which source pages to use, and in what order they appear in the output -
+                                       like a print dialog's "Pages" field. Comma-separated single pages and
+                                       ascending ranges, 1-based, e.g. "3-20,25,30-35" (default: every page).
+                                       An open-ended range ("13-") means "page 13 through the last page" -
+                                       use this when a cover or title page is handled separately and shouldn't
+                                       be counted as page 1 of the booklet, without needing to know the
+                                       document's total page count.
           --split-signatures        Write one front/back/duplex file set per signature instead of one combined
                                        set for the whole document, e.g. booklet-front-sig01.pdf, -sig02.pdf, ...
                                        Use this when each signature will be folded and stitched as its own
