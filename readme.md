@@ -223,3 +223,8 @@ images. Each writes into its own folder under `out/` so they don't clobber each 
   documents at high DPI will use a corresponding amount of memory.
 - PDFium (used for rasterization) is not thread-safe, so pages are rendered
   sequentially — expect roughly linear time in page count × DPI.
+
+## License
+
+[MIT](LICENSE) — same permissive license as every dependency this project pulls in
+(PDFsharp, PDFtoImage, SkiaSharp, and PDFium via its bblanchon binaries).
